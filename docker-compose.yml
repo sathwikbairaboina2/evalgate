@@ -1,0 +1,24 @@
+# Everything runs in containers. Ollama is NOT started here: it is the shared host daemon,
+# reached from containers at host.docker.internal:11434.
+services:
+  test:
+    build: { context: ., target: build }
+    command: ["pnpm", "test"]
+
+  example:
+    build: { context: ., target: runtime }
+    entrypoint: ["bash", "/app/scripts/docker-example.sh"]
+    volumes:
+      - ./.evalgate/docker:/out
+
+  calibrate:
+    build: { context: ., target: runtime }
+    profiles: ["ollama"] # opt-in: needs the host Ollama daemon
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      EVALGATE_JUDGE_BASE_URL: http://host.docker.internal:11434/v1
+      EVALGATE_JUDGE_MODEL: qwen3.8:27b
+    command: ["calibrate", "/app/examples/calibration/support-labels.yaml", "--out", "/out/calibration.md", "--json", "/out/calibration.json"]
+    volumes:
+      - ./.evalgate/docker:/out
