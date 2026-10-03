@@ -3,7 +3,7 @@
 Agent regression tests in CI. Evalgate runs an eval suite on a pull request's base and head, posts a score-diff comment, and fails the check when the agent got measurably worse. Its LLM judge is calibrated against human labels with Cohen's kappa.
 
 - Repository: `taskarinchu/evalgate`
-- Status: v0.1 in development (spec, plan and ADRs done; implementation in progress)
+- Status: v0.1 shipped locally (all 14 plan tasks done; 112 tests passing; not yet run on GitHub Actions)
 - Stack: Node 24, TypeScript 5 (strict), pnpm 9, vitest, esbuild, zod, ajv, yaml
 - Spec: `docs/superpowers/specs/2026-10-03-evalgate.md`
 - Plan: `docs/superpowers/plans/2026-10-03-evalgate.md`
