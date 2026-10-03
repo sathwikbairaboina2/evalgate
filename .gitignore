@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+.evalgate/
+.env
+.env.*
+!.env*.example
