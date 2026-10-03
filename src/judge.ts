@@ -39,22 +39,63 @@ export function buildMessages(req: JudgeRequest): { role: "system" | "user"; con
   ];
 }
 
+/** Balanced `{...}` spans, left to right. Braces inside JSON strings do not count. */
+export function extractJsonObjects(text: string): string[] {
+  const spans: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== "{") {
+      i++;
+      continue;
+    }
+    let depth = 0;
+    let inString = false;
+    let end = -1;
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j];
+      if (inString) {
+        if (ch === "\\") j++;
+        else if (ch === '"') inString = false;
+      } else if (ch === '"') inString = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}" && --depth === 0) {
+        end = j;
+        break;
+      }
+    }
+    if (end === -1) {
+      i++;
+    } else {
+      spans.push(text.slice(i, end + 1));
+      i = end + 1;
+    }
+  }
+  return spans;
+}
+
 export function parseVerdict(text: string): JudgeVerdict {
   const cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-  const match = cleaned.match(/\{[\s\S]*\}/);
-  if (!match) throw new JudgeError(`judge reply has no JSON object: ${truncate(cleaned)}`);
-  let obj: unknown;
-  try {
-    obj = JSON.parse(match[0]);
-  } catch {
-    throw new JudgeError(`judge reply is not valid JSON: ${truncate(match[0])}`);
+  if (!cleaned.includes("{")) throw new JudgeError(`judge reply has no JSON object: ${truncate(cleaned)}`);
+  let sawObject = false;
+  for (const span of extractJsonObjects(cleaned)) {
+    let obj: unknown;
+    try {
+      obj = JSON.parse(span);
+    } catch {
+      continue;
+    }
+    if (typeof obj !== "object" || obj === null) continue;
+    sawObject = true;
+    if (!("verdict" in obj)) continue;
+    const record = obj as Record<string, unknown>;
+    const verdict = String(record.verdict ?? "").toLowerCase();
+    if (verdict !== "pass" && verdict !== "fail") {
+      throw new JudgeError(`judge verdict must be "pass" or "fail", got: ${truncate(span)}`);
+    }
+    return { pass: verdict === "pass", reason: String(record.reason ?? "") };
   }
-  const record = typeof obj === "object" && obj !== null ? (obj as Record<string, unknown>) : {};
-  const verdict = String(record.verdict ?? "").toLowerCase();
-  if (verdict !== "pass" && verdict !== "fail") {
-    throw new JudgeError(`judge verdict must be "pass" or "fail", got: ${truncate(match[0])}`);
-  }
-  return { pass: verdict === "pass", reason: String(record.reason ?? "") };
+  if (sawObject) throw new JudgeError(`judge reply has no "verdict" field: ${truncate(cleaned)}`);
+  throw new JudgeError(`judge reply is not valid JSON: ${truncate(cleaned)}`);
 }
 
 export function createOpenAIJudge(spec: JudgeSpec, deps: { fetch: FetchLike; env: NodeJS.ProcessEnv }): Judge {

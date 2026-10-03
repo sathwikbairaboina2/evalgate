@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMessages, createOpenAIJudge, JudgeError, parseVerdict } from "../src/judge.js";
+import { buildMessages, createOpenAIJudge, extractJsonObjects, JudgeError, parseVerdict } from "../src/judge.js";
 import type { JudgeSpec } from "../src/types.js";
 
 const spec: JudgeSpec = { baseUrl: "http://judge.test/v1/", model: "m", apiKeyEnv: "EVALGATE_JUDGE_API_KEY", temperature: 0, timeoutMs: 1000 };
@@ -29,6 +29,30 @@ describe("parseVerdict", () => {
     expect(() => parseVerdict("I think it passes")).toThrow(JudgeError);
     expect(() => parseVerdict("{verdict: pass}")).toThrow(JudgeError);
     expect(() => parseVerdict('{"reason":"x"}')).toThrow(/verdict/);
+  });
+  it("skips a leading brace group that is not a verdict", () => {
+    expect(parseVerdict('Note {x}. {"verdict":"pass","reason":"ok"}').pass).toBe(true);
+  });
+  it("takes the first verdict when there are two objects", () => {
+    expect(parseVerdict('{"verdict":"fail","reason":"a"} {"verdict":"pass","reason":"b"}')).toEqual({ pass: false, reason: "a" });
+  });
+  it("is not fooled by braces inside strings", () => {
+    expect(parseVerdict('{"verdict":"pass","reason":"uses } and { in text"}')).toEqual({ pass: true, reason: "uses } and { in text" });
+  });
+  it("throws on an unbalanced object", () => {
+    expect(() => parseVerdict('{"verdict": "pass"')).toThrow(JudgeError);
+  });
+  it("never passes an object without a verdict", () => {
+    expect(() => parseVerdict('{"note":"no verdict here"}')).toThrow(JudgeError);
+  });
+});
+
+describe("extractJsonObjects", () => {
+  it("returns balanced spans in order", () => {
+    expect(extractJsonObjects('a {"k":"}"} b {"z":{"y":1}}')).toEqual(['{"k":"}"}', '{"z":{"y":1}}']);
+  });
+  it("returns nothing for unbalanced text", () => {
+    expect(extractJsonObjects('{"a": 1')).toEqual([]);
   });
 });
 
