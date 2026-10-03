@@ -256,27 +256,33 @@ docker compose --profile ollama run --rm calibrate   # live judge calibration vi
 | Calibration run time | Under 20 minutes for 16 items on the local model | `durationMs` in the calibration report |
 | Gate overhead | Compare under 1 s for 100 cases | Timing `evalgate compare` (stretch) |
 
-Results (measured): not yet measured. The builder fills these in from real output.
+Results (measured, 2026-10-03):
+
+- Tests: `pnpm test` gives `Test Files  11 passed (11)` and `Tests  112 passed (112)`, locally and in Docker (`docker compose run --rm test`).
+- Toy agent: baseline `mean 1.000, 10/10 passing`; regressed `mean 0.500, 5/10 passing`; `compare` exits 1 (p = 0.0313), and exits 0 on identical runs.
+- Judge-human agreement: kappa 1.000 (raw agreement 100.0%, 16 scored, 0 judge errors) with `qwen3.8:27b`.
+- Calibration run time: 156.8 s for 16 items.
+- Gate overhead (compare under 1 s for 100 cases): not measured.
 
 ## 11. Milestones
 
 v0.1 (one commit per task, see the plan):
 
 - [x] Spec, ADRs, plan, dev docs
-- [ ] Task 1: toolchain + statistics core (permutation test, kappa)
-- [ ] Task 2: shared types + deterministic scorers
-- [ ] Task 3: suite config loader (zod strict)
-- [ ] Task 4: OpenAI-compatible judge
-- [ ] Task 5: command and HTTP targets
-- [ ] Task 6: scoring + suite runner
-- [ ] Task 7: base-vs-head comparison (gate)
-- [ ] Task 8: Markdown PR comment
-- [ ] Task 9: judge calibration
-- [ ] Task 10: toy agent, example suites, labelled set
-- [ ] Task 11: CLI + process entry
-- [ ] Task 12: bundle, GitHub Action, workflows
-- [ ] Task 13: Docker (compose services: test, example, calibrate)
-- [ ] Task 14: README, live calibration (optional), handoff
+- [x] Task 1: toolchain + statistics core (permutation test, kappa)
+- [x] Task 2: shared types + deterministic scorers
+- [x] Task 3: suite config loader (zod strict)
+- [x] Task 4: OpenAI-compatible judge
+- [x] Task 5: command and HTTP targets
+- [x] Task 6: scoring + suite runner
+- [x] Task 7: base-vs-head comparison (gate)
+- [x] Task 8: Markdown PR comment
+- [x] Task 9: judge calibration
+- [x] Task 10: toy agent, example suites, labelled set
+- [x] Task 11: CLI + process entry
+- [x] Task 12: bundle, GitHub Action, workflows
+- [x] Task 13: Docker (compose services: test, example, calibrate)
+- [x] Task 14: README, live calibration (optional), handoff
 
 Stretch (v0.2+):
 
