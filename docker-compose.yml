@@ -1,3 +1,4 @@
+name: evalgate
 # Everything runs in containers. Ollama is NOT started here: it is the shared host daemon,
 # reached from containers at host.docker.internal:11434.
 services:
