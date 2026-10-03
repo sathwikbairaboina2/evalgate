@@ -220,7 +220,7 @@ Caveat: 16 author-labelled items with clear-cut answers is a small, easy sample,
 
 ```bash
 pnpm typecheck
-pnpm test        # 13 files, 136 tests; no network (injected fetch, fake judge); the action e2e test needs bash and git
+pnpm test        # 13 files, 139 tests; no network (injected fetch, fake judge); the action e2e test needs bash and git
 pnpm build       # bundles src/bin.ts into dist/cli.js
 pnpm lint:actions # actionlint + ShellCheck in Docker (rhysd/actionlint:1.7.12)
 docker compose run --rm test

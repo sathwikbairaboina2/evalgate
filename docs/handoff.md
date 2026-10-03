@@ -13,3 +13,10 @@
 - Left: run the action on a real GitHub PR, actionlint, a larger multi-rater labelled set (kappa 1.000 on 16 easy items is weak evidence).
 
 - Ruling: builder commits e87e213..9e962fe carry the `Co-Authored-By: Claude Sonnet 5.5` trailer, not Opus 5.5, because Sonnet wrote the code and the trailer should attribute accurately. History is not rewritten.
+
+## 2026-10-04 — Claude (Opus lead) — branch main
+
+- Changed: verified the review fix for the stale base worktree. With the `git worktree remove`/`git worktree prune` pre-clean in `scripts/action/evaluate-base.sh` temporarily removed, both new e2e cases fail (`2 failed | 3 passed`); with it restored, all pass. Rewrote `docs/DEVDOCS.md` as a short developer guide. Updated the README test count to 139.
+- Verified (2026-10-04): `pnpm typecheck` clean; `pnpm test` 13 files / 139 tests passed; `pnpm build` ok; `pnpm lint:actions` actionlint ok, shellcheck ok; `docker compose build` then `docker compose run --rm test` 13 files / 139 tests passed; `docker compose run --rm example` exit 1; `docker compose down`, no `evalgate` containers left; CLI smoke base 1.000, regressed 0.500, p = 0.0313, compare exit 1.
+- Left for the user: push and run the action on a real GitHub PR (including a read-only fork token); a harder, multi-rater calibration set (`docs/calibration/README.md`); release (tag, committed `dist/`, Marketplace, npm); any paid-API judge run.
+- How to verify: `pnpm install && pnpm typecheck && pnpm test && pnpm build && pnpm lint:actions`; `docker compose build && docker compose run --rm test && docker compose run --rm example` (expects exit 1).
