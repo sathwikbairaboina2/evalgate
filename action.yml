@@ -1,0 +1,129 @@
+name: Evalgate
+description: Run an agent eval suite on PR base and head, comment the score diff, and fail on regression.
+author: Sathwik
+branding:
+  icon: check-circle
+  color: green
+inputs:
+  suite:
+    description: Path to the evalgate suite YAML, relative to the repository root.
+    required: true
+  base-ref:
+    description: Git ref or SHA to compare against. Defaults to the pull request base SHA.
+    required: false
+    default: ""
+  base-setup:
+    description: Shell command run inside the base checkout before evaluating it (for example "npm ci").
+    required: false
+    default: ""
+  min-delta:
+    description: Override gate.minDelta.
+    required: false
+    default: ""
+  alpha:
+    description: Override gate.alpha.
+    required: false
+    default: ""
+  case-threshold:
+    description: Override gate.caseThreshold.
+    required: false
+    default: ""
+  comment:
+    description: Post or update the PR comment ("true" or "false").
+    required: false
+    default: "true"
+  github-token:
+    description: Token used to comment on the pull request.
+    required: false
+    default: ${{ github.token }}
+outputs:
+  regression:
+    description: '"true" if the gate failed.'
+    value: ${{ steps.compare.outputs.regression }}
+  comment-path:
+    description: Path of the rendered Markdown comment.
+    value: ${{ steps.compare.outputs.comment-path }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "24"
+
+    - name: Build evalgate
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        if [ ! -f dist/cli.js ]; then
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm build
+        fi
+
+    - name: Evaluate head
+      shell: bash
+      env:
+        EVALGATE: ${{ github.action_path }}/dist/cli.js
+        SUITE: ${{ inputs.suite }}
+      run: node "$EVALGATE" run "$SUITE" --out "$RUNNER_TEMP/evalgate-head.json"
+
+    - name: Evaluate base
+      shell: bash
+      env:
+        EVALGATE: ${{ github.action_path }}/dist/cli.js
+        SUITE: ${{ inputs.suite }}
+        BASE_REF: ${{ inputs.base-ref || github.event.pull_request.base.sha }}
+        BASE_SETUP: ${{ inputs.base-setup }}
+      run: |
+        if [ -z "$BASE_REF" ]; then
+          echo "::error::evalgate: no base-ref given and this is not a pull_request event"
+          exit 2
+        fi
+        BASE_DIR="$RUNNER_TEMP/evalgate-base"
+        rm -rf "$BASE_DIR"
+        git worktree add --detach "$BASE_DIR" "$BASE_REF"
+        if [ -n "$BASE_SETUP" ]; then (cd "$BASE_DIR" && bash -c "$BASE_SETUP"); fi
+        node "$EVALGATE" run "$SUITE" --workdir "$BASE_DIR/$(dirname "$SUITE")" --out "$RUNNER_TEMP/evalgate-base.json"
+
+    - name: Compare
+      id: compare
+      shell: bash
+      env:
+        EVALGATE: ${{ github.action_path }}/dist/cli.js
+        MIN_DELTA: ${{ inputs.min-delta }}
+        ALPHA: ${{ inputs.alpha }}
+        CASE_THRESHOLD: ${{ inputs.case-threshold }}
+      run: |
+        args=()
+        if [ -n "$MIN_DELTA" ]; then args+=(--min-delta "$MIN_DELTA"); fi
+        if [ -n "$ALPHA" ]; then args+=(--alpha "$ALPHA"); fi
+        if [ -n "$CASE_THRESHOLD" ]; then args+=(--case-threshold "$CASE_THRESHOLD"); fi
+        COMMENT="$RUNNER_TEMP/evalgate-comment.md"
+        set +e
+        node "$EVALGATE" compare --base "$RUNNER_TEMP/evalgate-base.json" --head "$RUNNER_TEMP/evalgate-head.json" --comment "$COMMENT" "${args[@]}"
+        code=$?
+        set -e
+        echo "comment-path=$COMMENT" >> "$GITHUB_OUTPUT"
+        if [ -f "$COMMENT" ]; then cat "$COMMENT" >> "$GITHUB_STEP_SUMMARY"; fi
+        if [ "$code" -eq 0 ]; then echo "regression=false" >> "$GITHUB_OUTPUT";
+        elif [ "$code" -eq 1 ]; then echo "regression=true" >> "$GITHUB_OUTPUT";
+        else exit "$code"; fi
+
+    - name: Post PR comment
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR: ${{ github.event.pull_request.number }}
+        FILE: ${{ steps.compare.outputs.comment-path }}
+      run: |
+        gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body-file "$FILE" \
+          || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$FILE" \
+          || echo "::warning::evalgate: could not post the PR comment (read-only token on a fork PR?)"
+
+    - name: Enforce gate
+      if: steps.compare.outputs.regression == 'true'
+      shell: bash
+      run: |
+        echo "::error::evalgate: regression beyond threshold (see the PR comment or job summary)"
+        exit 1

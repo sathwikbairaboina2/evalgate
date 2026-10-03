@@ -1,0 +1,23 @@
+# Sample: gate every PR on the toy agent's eval suite.
+# In your repo, replace `uses: ./` with `uses: <owner>/evalgate@v0.1` and point `suite` at your file.
+name: Evalgate
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # base commit must be available for the base worktree
+      - uses: ./
+        with:
+          suite: examples/toy-agent/evalgate.yaml
+        # For llm-judge suites, point the judge at a reachable endpoint:
+        # env:
+        #   EVALGATE_JUDGE_BASE_URL: https://api.openai.com/v1
+        #   EVALGATE_JUDGE_MODEL: gpt-4o-mini
+        #   EVALGATE_JUDGE_API_KEY: ${{ secrets.OPENAI_API_KEY }}
