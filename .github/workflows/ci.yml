@@ -19,6 +19,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: node scripts/lint-actions.mjs
       - name: Smoke test - regressed toy agent must fail the gate
         run: |
           node dist/cli.js run examples/toy-agent/evalgate.yaml --out .evalgate/base.json
