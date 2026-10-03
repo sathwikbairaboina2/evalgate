@@ -73,6 +73,18 @@ jobs:
           suite: examples/toy-agent/evalgate.yaml
 ```
 
+The comment is created once and then edited in place: `evalgate comment` finds it by its `<!-- evalgate -->` marker, so other bots' comments are never overwritten ([ADR-0008](docs/adr/0008-pr-comment-upsert-by-marker.md)). That needs `pull-requests: write`; on a fork PR with a read-only token the step prints a warning and the job still reports the gate result. The base checkout is a temporary git worktree that is cleaned up before and after each run, so the action also works on self-hosted runners.
+
+| Input | Purpose |
+| --- | --- |
+| `suite` | Suite YAML path (required) |
+| `base-ref`, `base-setup` | Ref to compare against; command to run in the base checkout first |
+| `min-delta`, `alpha`, `case-threshold` | Override the suite's `gate` |
+| `head-target-url`, `base-target-url` | For `http` targets: the head and base deployments (passed as `--target-url`) |
+| `comment`, `github-token` | Post the PR comment; the token to use |
+
+Post a comment yourself: `GITHUB_TOKEN=... evalgate comment --repo owner/name --pr 12 --body-file .evalgate/comment.md [--api-url url]`.
+
 ## Suite format
 
 ```yaml
@@ -181,7 +193,7 @@ Measured on 2026-10-03 with `qwen3.8:27b` on local Ollama (run in Docker; `reaso
 | **Human: pass** | 8 | 0 |
 | **Human: fail** | 0 | 8 |
 
-Caveat: 16 author-labelled items with clear-cut answers is a small, easy sample, so a kappa of 1.000 here says the judge handles this policy well, not that it will match your labels. Full report: [`docs/calibration/2026-10-03-qwen3.8-27b.md`](docs/calibration/2026-10-03-qwen3.8-27b.md) and `.json`.
+Caveat: 16 author-labelled items with clear-cut answers is a small, easy sample, so a kappa of 1.000 here says the judge handles this policy well, not that it will match your labels. Full report: [`docs/calibration/2026-10-03-qwen3.8-27b.md`](docs/calibration/2026-10-03-qwen3.8-27b.md) and `.json`. The protocol for a harder, two-rater set is in [`docs/calibration/README.md`](docs/calibration/README.md).
 
 ## Exit codes
 
@@ -189,7 +201,7 @@ Caveat: 16 author-labelled items with clear-cut answers is a small, easy sample,
 | --- | --- |
 | 0 | OK |
 | 1 | Gate failed: regression (`compare`) or kappa below `--min-kappa` (`calibrate`) |
-| 2 | Usage, config or input error |
+| 2 | Usage, config or input error (including a failed `evalgate comment`) |
 
 ## Design decisions
 
@@ -200,14 +212,17 @@ Caveat: 16 author-labelled items with clear-cut answers is a small, easy sample,
 - [ADR-0005: composite action and esbuild bundle](docs/adr/0005-composite-action-esbuild-bundle.md)
 - [ADR-0006: testing without network](docs/adr/0006-testing-without-network.md)
 - [ADR-0007: no cached baselines](docs/adr/0007-no-cached-baselines.md)
+- [ADR-0008: PR comment upsert by marker](docs/adr/0008-pr-comment-upsert-by-marker.md)
+- [ADR-0009: action scripts and local end-to-end test](docs/adr/0009-action-scripts-local-e2e.md)
 - [Developer documentation](docs/DEVDOCS.md)
 
 ## Development
 
 ```bash
 pnpm typecheck
-pnpm test        # 11 files, 112 tests; unit tests use no network (injected fetch, fake judge)
+pnpm test        # 13 files, 136 tests; no network (injected fetch, fake judge); the action e2e test needs bash and git
 pnpm build       # bundles src/bin.ts into dist/cli.js
+pnpm lint:actions # actionlint + ShellCheck in Docker (rhysd/actionlint:1.7.12)
 docker compose run --rm test
 docker compose run --rm example
 ```

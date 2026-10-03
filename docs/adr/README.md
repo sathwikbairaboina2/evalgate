@@ -9,3 +9,5 @@
 | [0005](0005-composite-action-esbuild-bundle.md) | Composite GitHub Action + single-file esbuild bundle |
 | [0006](0006-testing-without-network.md) | Tests: dependency injection, no network, fake judge, seeded randomness |
 | [0007](0007-no-cached-baselines.md) | Re-run base on every PR; no stored baselines |
+| [0008](0008-pr-comment-upsert-by-marker.md) | PR comment: find by marker and edit through the REST API, failure is a warning |
+| [0009](0009-action-scripts-local-e2e.md) | Action steps in `scripts/action/`, actionlint + ShellCheck gate, local e2e in a temp git repo |
