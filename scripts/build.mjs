@@ -1,12 +1,15 @@
 import { build } from "esbuild";
 
+const flag = process.argv.indexOf("--outfile");
+const outfile = flag !== -1 && process.argv[flag + 1] ? process.argv[flag + 1] : "dist/cli.js";
+
 await build({
   entryPoints: ["src/bin.ts"],
   bundle: true,
   platform: "node",
   target: "node24",
   format: "esm",
-  outfile: "dist/cli.js",
+  outfile,
   legalComments: "none",
   // ajv is CommonJS; give the ESM bundle a real `require` for its internal requires.
   banner: {

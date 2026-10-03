@@ -28,6 +28,14 @@ inputs:
     description: Override gate.caseThreshold.
     required: false
     default: ""
+  head-target-url:
+    description: "For http targets: URL of the head deployment (passed as --target-url to the head run)."
+    required: false
+    default: ""
+  base-target-url:
+    description: "For http targets: URL of the base deployment (passed as --target-url to the base run)."
+    required: false
+    default: ""
   comment:
     description: Post or update the PR comment ("true" or "false").
     required: false
@@ -65,7 +73,8 @@ runs:
       env:
         EVALGATE: ${{ github.action_path }}/dist/cli.js
         SUITE: ${{ inputs.suite }}
-      run: node "$EVALGATE" run "$SUITE" --out "$RUNNER_TEMP/evalgate-head.json"
+        HEAD_TARGET_URL: ${{ inputs.head-target-url }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/action/evaluate-head.sh"
 
     - name: Evaluate base
       shell: bash
@@ -74,16 +83,8 @@ runs:
         SUITE: ${{ inputs.suite }}
         BASE_REF: ${{ inputs.base-ref || github.event.pull_request.base.sha }}
         BASE_SETUP: ${{ inputs.base-setup }}
-      run: |
-        if [ -z "$BASE_REF" ]; then
-          echo "::error::evalgate: no base-ref given and this is not a pull_request event"
-          exit 2
-        fi
-        BASE_DIR="$RUNNER_TEMP/evalgate-base"
-        rm -rf "$BASE_DIR"
-        git worktree add --detach "$BASE_DIR" "$BASE_REF"
-        if [ -n "$BASE_SETUP" ]; then (cd "$BASE_DIR" && bash -c "$BASE_SETUP"); fi
-        node "$EVALGATE" run "$SUITE" --workdir "$BASE_DIR/$(dirname "$SUITE")" --out "$RUNNER_TEMP/evalgate-base.json"
+        BASE_TARGET_URL: ${{ inputs.base-target-url }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/action/evaluate-base.sh"
 
     - name: Compare
       id: compare
@@ -93,33 +94,17 @@ runs:
         MIN_DELTA: ${{ inputs.min-delta }}
         ALPHA: ${{ inputs.alpha }}
         CASE_THRESHOLD: ${{ inputs.case-threshold }}
-      run: |
-        args=()
-        if [ -n "$MIN_DELTA" ]; then args+=(--min-delta "$MIN_DELTA"); fi
-        if [ -n "$ALPHA" ]; then args+=(--alpha "$ALPHA"); fi
-        if [ -n "$CASE_THRESHOLD" ]; then args+=(--case-threshold "$CASE_THRESHOLD"); fi
-        COMMENT="$RUNNER_TEMP/evalgate-comment.md"
-        set +e
-        node "$EVALGATE" compare --base "$RUNNER_TEMP/evalgate-base.json" --head "$RUNNER_TEMP/evalgate-head.json" --comment "$COMMENT" "${args[@]}"
-        code=$?
-        set -e
-        echo "comment-path=$COMMENT" >> "$GITHUB_OUTPUT"
-        if [ -f "$COMMENT" ]; then cat "$COMMENT" >> "$GITHUB_STEP_SUMMARY"; fi
-        if [ "$code" -eq 0 ]; then echo "regression=false" >> "$GITHUB_OUTPUT";
-        elif [ "$code" -eq 1 ]; then echo "regression=true" >> "$GITHUB_OUTPUT";
-        else exit "$code"; fi
+      run: bash "$GITHUB_ACTION_PATH/scripts/action/compare.sh"
 
     - name: Post PR comment
       if: inputs.comment == 'true' && github.event_name == 'pull_request'
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.github-token }}
+        EVALGATE: ${{ github.action_path }}/dist/cli.js
+        GITHUB_TOKEN: ${{ inputs.github-token }}
         PR: ${{ github.event.pull_request.number }}
         FILE: ${{ steps.compare.outputs.comment-path }}
-      run: |
-        gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body-file "$FILE" \
-          || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$FILE" \
-          || echo "::warning::evalgate: could not post the PR comment (read-only token on a fork PR?)"
+      run: bash "$GITHUB_ACTION_PATH/scripts/action/post-comment.sh"
 
     - name: Enforce gate
       if: steps.compare.outputs.regression == 'true'
