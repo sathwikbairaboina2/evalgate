@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import { loadLabelSet, renderCalibration, runCalibration } from "./calibrate.js";
 import { compareRuns } from "./compare.js";
 import { ConfigError, loadSuite } from "./config.js";
+import { GitHubError, upsertComment } from "./github.js";
 import { createOpenAIJudge } from "./judge.js";
 import { renderComment } from "./report.js";
 import { runSuite } from "./runner.js";
@@ -27,6 +28,7 @@ export const USAGE = `Usage:
   evalgate compare --base base.json --head head.json [--comment comment.md]
                    [--min-delta x] [--alpha x] [--case-threshold x]
   evalgate calibrate <labels.yaml> [--out report.md] [--json report.json] [--min-kappa x]
+  evalgate comment --repo owner/name --pr N --body-file comment.md [--api-url url]   (token from GITHUB_TOKEN)
 
 Exit codes: 0 ok, 1 regression (compare) or kappa below --min-kappa (calibrate), 2 usage/config error.
 `;
@@ -41,6 +43,8 @@ export async function main(argv: string[], io: Io): Promise<number> {
         return await cmdCompare(rest, io);
       case "calibrate":
         return await cmdCalibrate(rest, io);
+      case "comment":
+        return await cmdComment(rest, io);
       case "help":
       case "--help":
       case "-h":
@@ -55,6 +59,11 @@ export async function main(argv: string[], io: Io): Promise<number> {
   } catch (e) {
     const err = e as Error & { code?: string };
     const isArgs = typeof err.code === "string" && err.code.startsWith("ERR_PARSE_ARGS");
+    if (err instanceof GitHubError) {
+      io.stderr(`evalgate: error: ${err.message}
+`);
+      return 2;
+    }
     if (err instanceof UsageError || err instanceof ConfigError || isArgs) {
       io.stderr(`evalgate: error: ${err.message}\n`);
       if (!(err instanceof ConfigError)) io.stderr(USAGE);
@@ -179,5 +188,33 @@ async function cmdCalibrate(args: string[], io: Io): Promise<number> {
     io.stderr(`evalgate: kappa ${report.kappa === null ? "n/a" : report.kappa.toFixed(3)} is below --min-kappa ${minKappa}\n`);
     return 1;
   }
+  return 0;
+}
+
+async function cmdComment(args: string[], io: Io): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    options: { repo: { type: "string" }, pr: { type: "string" }, "body-file": { type: "string" }, "api-url": { type: "string" } },
+  });
+  if (!values.repo || !values.pr || !values["body-file"]) throw new UsageError("comment needs --repo, --pr and --body-file");
+  const token = io.env.GITHUB_TOKEN;
+  if (!token) throw new UsageError("comment needs GITHUB_TOKEN in the environment");
+  const pr = Number(values.pr);
+  let body: string;
+  try {
+    body = await readFile(resolveFrom(io, values["body-file"]), "utf8");
+  } catch (e) {
+    throw new UsageError(`cannot read body file ${values["body-file"]}: ${(e as Error).message}`);
+  }
+  const r = await upsertComment({
+    fetch: io.fetch,
+    apiUrl: values["api-url"] ?? io.env.GITHUB_API_URL ?? "https://api.github.com",
+    token,
+    repo: values.repo,
+    pr,
+    body,
+  });
+  io.stderr(`evalgate: comment ${r.action}: ${r.url}
+`);
   return 0;
 }

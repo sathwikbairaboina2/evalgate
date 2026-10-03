@@ -149,3 +149,44 @@ describe("usage and errors", () => {
     expect(t.err()).toMatch(/^evalgate: error: invalid suite/);
   });
 });
+
+describe("evalgate comment", () => {
+  async function bodyFile() {
+    const f = path.join(dir, "comment.md");
+    await writeFile(f, "<!-- evalgate -->\nhi", "utf8");
+    return f;
+  }
+  function ghFetch(urls: string[], postStatus = 201): FetchLike {
+    return async (url, init) => {
+      urls.push(`${init.method ?? "GET"} ${url}`);
+      if ((init.method ?? "GET") === "GET") return new Response("[]", { status: 200 });
+      return new Response(JSON.stringify({ id: 1, html_url: "https://gh.test/c/1" }), { status: postStatus });
+    };
+  }
+
+  it("exits 2 without GITHUB_TOKEN", async () => {
+    const t = makeIo({ GITHUB_TOKEN: "" });
+    expect(await main(["comment", "--repo", "o/r", "--pr", "1", "--body-file", await bodyFile()], t.io)).toBe(2);
+    expect(t.err()).toContain("GITHUB_TOKEN");
+  });
+
+  it("creates the comment and exits 0", async () => {
+    const urls: string[] = [];
+    const t = makeIo({ GITHUB_TOKEN: "t" }, ghFetch(urls));
+    expect(await main(["comment", "--repo", "o/r", "--pr", "1", "--body-file", await bodyFile()], t.io)).toBe(0);
+    expect(t.err()).toContain("comment created");
+  });
+
+  it("honours --api-url with a trailing slash", async () => {
+    const urls: string[] = [];
+    const t = makeIo({ GITHUB_TOKEN: "t" }, ghFetch(urls));
+    await main(["comment", "--repo", "o/r", "--pr", "1", "--body-file", await bodyFile(), "--api-url", "https://ghe.test/api/"], t.io);
+    expect(urls[0]).toBe("GET https://ghe.test/api/repos/o/r/issues/1/comments?per_page=100&page=1");
+  });
+
+  it("exits 2 on a 403", async () => {
+    const t = makeIo({ GITHUB_TOKEN: "t" }, ghFetch([], 403));
+    expect(await main(["comment", "--repo", "o/r", "--pr", "1", "--body-file", await bodyFile()], t.io)).toBe(2);
+    expect(t.err()).toContain("403");
+  });
+});
