@@ -6,7 +6,7 @@
 The action posted its comment with `gh pr comment --edit-last`. That edits the last comment written by the token's user, which is `github-actions[bot]` for every workflow in the repository. If another bot commented after evalgate, the next run overwrote that comment instead. The `<!-- evalgate -->` marker that `report.ts` writes at the top of every comment was never used to find the right one.
 
 ## Decision
-A new command, `evalgate comment --repo owner/name --pr N --body-file f`, lists the comments on the pull request (100 per page) and picks the newest one whose body starts with the marker. It edits that comment with `PATCH`, or creates one with `POST` when none exists. It uses the REST API with plain `fetch` and `GITHUB_TOKEN`, so the `gh` CLI is no longer needed. The fetch is injected, so the logic is unit-tested without a network.
+A new command, `evalgate comment --repo owner/name --pr N --body-file f`, lists the comments on the pull request (100 per page) and picks the newest one whose body starts with the marker and whose author is a bot (`user.type == "Bot"`), because the marker is an invisible HTML comment that any participant could copy. It edits that comment with `PATCH`, or creates one with `POST` when none exists. It uses the REST API with plain `fetch` and `GITHUB_TOKEN`, so the `gh` CLI is no longer needed. The fetch is injected, so the logic is unit-tested without a network.
 
 HTTP errors and a missing token exit with code 2. The action step turns that into a `::warning::` and exits 0, so a read-only token on a fork PR never fails the job. The gate result does not depend on the comment.
 

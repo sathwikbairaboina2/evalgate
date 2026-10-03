@@ -25,9 +25,25 @@ function fake(handler: (c: Call) => Reply) {
 
 const base = { apiUrl: "https://api.test", token: "tok", repo: "o/r", pr: 5, body: `${COMMENT_MARKER}\nhello` };
 const others = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1, body: `c${i}` }));
+const bot = { type: "Bot" };
 const created = { id: 99, html_url: "https://gh.test/c/99" };
 
 describe("upsertComment", () => {
+  it("ignores a marker comment written by a human user", async () => {
+    const f = fake((c) =>
+      c.method === "GET" ? { json: [{ id: 5, body: COMMENT_MARKER, user: bot }, { id: 6, body: COMMENT_MARKER, user: { type: "User" } }] } : { json: created },
+    );
+    await upsertComment({ ...base, fetch: f.fetch });
+    expect(f.calls[1].method).toBe("PATCH");
+    expect(f.calls[1].url).toBe("https://api.test/repos/o/r/issues/comments/5");
+  });
+
+  it("creates a new comment when the only marker comment is from a user", async () => {
+    const f = fake((c) => (c.method === "GET" ? { json: [{ id: 6, body: COMMENT_MARKER, user: { type: "User" } }] } : { json: created }));
+    await upsertComment({ ...base, fetch: f.fetch });
+    expect(f.calls.map((c) => c.method)).toEqual(["GET", "POST"]);
+  });
+
   it("lists then creates when nothing matches", async () => {
     const f = fake((c) => (c.method === "GET" ? { json: [] } : { status: 201, json: created }));
     const r = await upsertComment({ ...base, fetch: f.fetch });
@@ -39,7 +55,7 @@ describe("upsertComment", () => {
 
   it("pages through comments and patches the marker comment on page 2", async () => {
     const f = fake((c) => {
-      if (c.method === "GET") return { json: c.url.endsWith("&page=1") ? others(100) : [{ id: 77, body: `${COMMENT_MARKER}\nold` }] };
+      if (c.method === "GET") return { json: c.url.endsWith("&page=1") ? others(100) : [{ id: 77, body: `${COMMENT_MARKER}\nold`, user: bot }] };
       return { json: { id: 77, html_url: "https://gh.test/c/77" } };
     });
     const r = await upsertComment({ ...base, fetch: f.fetch });
@@ -57,7 +73,7 @@ describe("upsertComment", () => {
 
   it("patches the newest of two marker comments", async () => {
     const f = fake((c) =>
-      c.method === "GET" ? { json: [{ id: 10, body: COMMENT_MARKER }, { id: 11, body: "x" }, { id: 12, body: COMMENT_MARKER }] } : { json: created },
+      c.method === "GET" ? { json: [{ id: 10, body: COMMENT_MARKER, user: bot }, { id: 11, body: "x" }, { id: 12, body: COMMENT_MARKER, user: bot }] } : { json: created },
     );
     await upsertComment({ ...base, fetch: f.fetch });
     expect(f.calls.at(-1)!.url.endsWith("/issues/comments/12")).toBe(true);

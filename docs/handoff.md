@@ -11,3 +11,5 @@
 - Review: re-ran `pnpm typecheck` (clean), `pnpm test` (11 files, 112 tests passed), `pnpm build`, and the CLI smoke test (base 1.000, regressed 0.500, compare exit 1). Checked the README's numbers against `docs/calibration/2026-10-03-qwen3.8-27b.json` (kappa 1, 156.8 s). No fix rounds were needed.
 - Caveat: during the build, the TDD red step was only observed for Task 1; for Tasks 2-14 the tests were written with the code from the plan.
 - Left: run the action on a real GitHub PR, actionlint, a larger multi-rater labelled set (kappa 1.000 on 16 easy items is weak evidence).
+
+- Ruling: builder commits e87e213..9e962fe carry the `Co-Authored-By: Claude Sonnet 5.5` trailer, not Opus 5.5, because Sonnet wrote the code and the trailer should attribute accurately. History is not rewritten.

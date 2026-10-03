@@ -98,11 +98,24 @@ describe.skipIf(!ready)("action scripts end to end", () => {
     expect(git("worktree", "list").split("\n")).toHaveLength(1);
   }, 60_000);
 
-  it("survives a second base run with the same RUNNER_TEMP (stale worktree)", () => {
+  it("recovers when the worktree is registered but its directory was wiped (cancelled job)", () => {
     git("checkout", "-q", headSha);
     const rt = freshTemp();
+    mkdirSync(rt, { recursive: true });
+    const dir = path.join(rt, "evalgate-base");
+    git("worktree", "add", "--detach", fwd(dir), baseSha);
+    rmSync(dir, { recursive: true, force: true });
     expect(runScript("evaluate-base", { BASE_REF: baseSha }, rt).status).toBe(0);
+    expect(git("worktree", "list").split("\n")).toHaveLength(1);
+  }, 60_000);
+
+  it("recovers when the worktree is still registered and present (killed job)", () => {
+    git("checkout", "-q", headSha);
+    const rt = freshTemp();
+    mkdirSync(rt, { recursive: true });
+    git("worktree", "add", "--detach", fwd(path.join(rt, "evalgate-base")), baseSha);
     expect(runScript("evaluate-base", { BASE_REF: baseSha }, rt).status).toBe(0);
+    expect(git("worktree", "list").split("\n")).toHaveLength(1);
   }, 60_000);
 
   it("reports no regression when head equals base", () => {

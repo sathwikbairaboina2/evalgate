@@ -29,7 +29,7 @@ export interface UpsertResult {
 const PAGE_SIZE = 100;
 const MAX_PAGES = 30;
 
-/** Create the evalgate PR comment, or edit the newest one that carries the marker. */
+/** Create the evalgate PR comment, or edit the newest bot-authored one that carries the marker. */
 export async function upsertComment(opts: UpsertOptions): Promise<UpsertResult> {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(opts.repo)) throw new GitHubError(`invalid repo "${opts.repo}" (expected owner/name)`);
   if (!Number.isInteger(opts.pr) || opts.pr <= 0) throw new GitHubError(`invalid pull request number "${opts.pr}"`);
@@ -62,8 +62,8 @@ export async function upsertComment(opts: UpsertOptions): Promise<UpsertResult> 
   const issue = `/repos/${opts.repo}/issues/${opts.pr}`;
   let existing: number | undefined;
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const items = (await call("GET", `${issue}/comments?per_page=${PAGE_SIZE}&page=${page}`)) as { id: number; body?: string }[];
-    for (const c of items) if ((c.body ?? "").trimStart().startsWith(COMMENT_MARKER)) existing = c.id;
+    const items = (await call("GET", `${issue}/comments?per_page=${PAGE_SIZE}&page=${page}`)) as { id: number; body?: string; user?: { type?: string } }[];
+    for (const c of items) if (c.user?.type === "Bot" && (c.body ?? "").trimStart().startsWith(COMMENT_MARKER)) existing = c.id;
     if (items.length < PAGE_SIZE) break;
   }
 

@@ -60,8 +60,7 @@ export async function main(argv: string[], io: Io): Promise<number> {
     const err = e as Error & { code?: string };
     const isArgs = typeof err.code === "string" && err.code.startsWith("ERR_PARSE_ARGS");
     if (err instanceof GitHubError) {
-      io.stderr(`evalgate: error: ${err.message}
-`);
+      io.stderr(`evalgate: error: ${err.message}\n`);
       return 2;
     }
     if (err instanceof UsageError || err instanceof ConfigError || isArgs) {
@@ -214,7 +213,6 @@ async function cmdComment(args: string[], io: Io): Promise<number> {
     pr,
     body,
   });
-  io.stderr(`evalgate: comment ${r.action}: ${r.url}
-`);
+  io.stderr(`evalgate: comment ${r.action}: ${r.url}\n`);
   return 0;
 }
