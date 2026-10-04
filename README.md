@@ -1,6 +1,16 @@
-# Evalgate
+# 🧪 Evalgate
+
+> Agent regression tests in CI. Runs evals on base and head of every PR and blocks the merge on a real drop.
 
 **Blocks the merge when your agent gets worse.** On the bundled toy agent, a bad prompt change drops the mean score 1.000 → 0.500 (paired permutation p = 0.0313) and the gate fails; the LLM judge agrees with human labels at Cohen's κ = 1.000 on 16 cases (qwen3.8:27b, local, small author-labelled set).
+
+<!-- readme-header -->
+[![CI](https://github.com/sathwikbairaboina2/evalgate/actions/workflows/ci.yml/badge.svg)](https://github.com/sathwikbairaboina2/evalgate/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![TypeScript](https://img.shields.io/badge/-TypeScript-555) ![GitHub Action](https://img.shields.io/badge/-GitHub%20Action-555) ![LLM judge](https://img.shields.io/badge/-LLM%20judge-555)
+
+| Measured | Source |
+|---|---|
+| **p = 0.031 caught** | `examples/toy-agent/ run` |
+| **κ 1.0 judge** | `docs/calibration/` |
 
 ## What it does
 
